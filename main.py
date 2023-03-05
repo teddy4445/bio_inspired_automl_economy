@@ -3,8 +3,18 @@ import os
 import numpy as np
 import pandas as pd
 from glob import glob
-from sklearn.linear_model import LinearRegression
 from sklearn.model_selection import train_test_split
+
+from sklearn.linear_model import LinearRegression, LogisticRegression # linear model for regression and classification
+from dl85 import DL85Classifier, DL85Predictor  # Optimal decision tree
+import autosklearn.classification # AutoML baseline - https://automl.github.io/auto-sklearn/master/#manual  [classification]
+import autosklearn.regression # AutoML baseline - https://automl.github.io/auto-sklearn/master/#manual [regression]
+
+from tpot import TPOTClassifier, TPOTRegressor # bio-inspired autoML
+from gplearn.genetic import SymbolicRegressor # bio-inspired autoML #2
+from scimed import SciMed # bio-inspired autoML #3
+# TODO: add later # bio-inspired autoML #4
+
 
 # project imports
 from consts import *
@@ -20,10 +30,12 @@ def metric(y_pred, y):
 
 
 def classification_metric(y_pred, y):
+    # TODO: david - add acc
     pass
 
 
 def regression_metric(y_pred, y):
+    # TODO: david - add mae
     pass
 
 
