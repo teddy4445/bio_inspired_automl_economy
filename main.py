@@ -1,27 +1,29 @@
 # library imports
-import os
-import numpy as np
 import pandas as pd
 from glob import glob
 from sklearn.model_selection import train_test_split
+from sklearn.metrics import accuracy_score, mean_absolute_error
 
-from sklearn.linear_model import LinearRegression, LogisticRegression # linear model for regression and classification
-from dl85 import DL85Classifier, DL85Predictor  # Optimal decision tree
-import autosklearn.classification # AutoML baseline - https://automl.github.io/auto-sklearn/master/#manual  [classification]
-import autosklearn.regression # AutoML baseline - https://automl.github.io/auto-sklearn/master/#manual [regression]
+from sklearn.linear_model import LinearRegression  # linear model for regression and classification
+try:
+    from dl85 import DL85Predictor  # Optimal decision tree
+    import autosklearn.regression  # AutoML baseline - https://automl.github.io/auto-sklearn/master/#manual [regression]
 
-from tpot import TPOTClassifier, TPOTRegressor # bio-inspired autoML
-from gplearn.genetic import SymbolicRegressor # bio-inspired autoML #2
-from scimed import SciMed # bio-inspired autoML #3
-# TODO: add later # bio-inspired autoML #4
-
+    from tpot import TPOTClassifier, TPOTRegressor  # bio-inspired autoML
+    from gplearn.genetic import SymbolicRegressor  # bio-inspired autoML #2
+    from symreg import Regressor  # bio-inspired autoML #3
+    # TODO: add later # bio-inspired autoML #4
+except Exception as error:
+    print("Error in loading libraries - try again! Error = {}".format(error))
 
 # project imports
 from consts import *
+from model_eval_func import model_eval_func, model_eval_func_titles
 
 
 # define the model's score metric for each case so it will be easy to replace later #
-def metric(y_pred, y):
+def metric(y_pred,
+           y):
     if len(set(y)) / len(y) > 0.1:
         return regression_metric(y_pred=y_pred,
                                  y=y)
@@ -29,14 +31,16 @@ def metric(y_pred, y):
                                  y=y)
 
 
-def classification_metric(y_pred, y):
-    # TODO: david - add acc
-    pass
+def classification_metric(y_pred,
+                          y):
+    return accuracy_score(y_pred=y_pred,
+                          y_true=y)
 
 
-def regression_metric(y_pred, y):
-    # TODO: david - add mae
-    pass
+def regression_metric(y_pred,
+                      y):
+    return mean_absolute_error(y_pred=y_pred,
+                               y_true=y)
 
 
 class Main:
@@ -48,10 +52,13 @@ class Main:
         pass
 
     @staticmethod
-    def run():
+    def run(prepare_meta_dataset: bool,
+            analyze_meta_dataset: bool):
         Main.prepare_io()
-        Main.prepare_meta_datasets()
-        Main.analyze_meta_datasets()
+        if prepare_meta_dataset:
+            Main.prepare_meta_datasets()
+        if analyze_meta_dataset:
+            Main.analyze_meta_datasets()
 
     @staticmethod
     def prepare_io():
@@ -67,26 +74,46 @@ class Main:
     def prepare_meta_datasets():
         columns = ["LR", "ODT", "DE", "AutoSKlearn", "TPOT", "GPlearn", "SciMed", "Glearn"]
 
-        if all([os.path.exists(os.path.join(RESULTS_FOLDER_PATH, file_name)) for file_name in ["meta_dataset_fit.csv",
-                                                                                               "meta_dataset_train.csv",
-                                                                                               "meta_dataset_test.csv"]]):
-            # TODO: david add logic to load the lists we already have
-            pass
+        if all([os.path.exists(os.path.join(RESULTS_FOLDER_PATH, file_name)) for file_name in [META_DATASET_FIT,
+                                                                                               META_DATASET_TRAIN,
+                                                                                               META_DATASET_TEST]]):
+            fit_df = pd.read_csv(os.path.exists(os.path.join(RESULTS_FOLDER_PATH, META_DATASET_FIT)),
+                                 index_col="index")
+            index = list(fit_df.index)
+            fit_performance = fit_df.values.tolist()
+            train_performance = pd.read_csv(os.path.exists(os.path.join(RESULTS_FOLDER_PATH, META_DATASET_TRAIN)),
+                                            index_col="index").values.tolist()
+            test_performance = pd.read_csv(os.path.exists(os.path.join(RESULTS_FOLDER_PATH, META_DATASET_TEST)),
+                                           index_col="index").values.tolist()
         else:
             index = []
             fit_performance = []
             train_performance = []
             test_performance = []
 
+        # load config file #
+        # it is assumed to be file_name,task_type - c/r,is_time_series - 0/1,window - 1 to infinity,y_target_col
+        config_df = {row["file_mame"]: {"task": row["task_type"],
+                                        "is_time_series": int(row["is_time_series"]),
+                                        "window": int(row["window"]),
+                                        "y_target_col": row["y_target_col"]}
+                     for row_index, row in pd.read_csv(CONFIG_FILE_PATH).iterrows()}
+
         # run over all the datasets
         for data_path in glob(os.path.join(DATA_FOLDER_PATH, "*.csv")):
 
             # if we have this dataset, just skip it
-            if os.path.basename(data_path.split(".csv")[0]) in index:
+            file_name = os.path.basename(data_path.split(".csv")[0])
+            if file_name in index:
                 continue
 
             # load dataset
             df = pd.read_csv(data_path)
+            # check if we need to make from time_series
+            if config_df[file_name]["is_time_series"]:
+                df = Main._to_time_series(data=df,
+                                          n_in=config_df[file_name]["window"])
+
             # make sure everything in the dataset is legit
             df.dropna(inplace=True)
             for col in list(df):
@@ -98,9 +125,14 @@ class Main:
             row_train = []
             row_test = []
 
+            # put the target column in the start
+            df.insert(0,
+                      config_df[file_name]["y_target_col"],
+                      df.pop(config_df[file_name]["y_target_col"]))
             # split to x and y
-            x = df.iloc[:, :-1]
-            y = df.iloc[:, -1]
+            x = df.iloc[:, 0:]
+            y = df.iloc[:, 0]
+
             # split to train and test for later
             x_train, x_test, y_train, y_test = train_test_split(x,
                                                                 y,
@@ -108,7 +140,7 @@ class Main:
                                                                 random_state=RANDOM_STATE)
             # train models #
             # TODO: david - add logic for all the models here
-            for model in [LinearRegression()]
+            for model in [LinearRegression()]:
                 fit_model = model
                 fit_model.fit(x,
                               y)
@@ -126,27 +158,26 @@ class Main:
                 row_test.append(metric(y_pred=y_pred_test,
                                        y=y_test))
 
-
             # store results for this dataset
             fit_performance.append(row_fit)
             train_performance.append(row_train)
             test_performance.append(row_test)
 
             # recall the file name so we will use it later, making sure the order is not important
-            index.append(os.path.basename(data_path.split(".csv")[0]))
+            index.append(file_name)
 
             # save all three datasets of the answers - this is not optimal but helps if something clashes
             pd.DataFrame(data=fit_performance,
                          index=index,
-                         columns=columns).to_csv(os.path.join(RESULTS_FOLDER_PATH, "meta_dataset_fit.csv"),
+                         columns=columns).to_csv(os.path.join(RESULTS_FOLDER_PATH, META_DATASET_FIT),
                                                  index=False)
             pd.DataFrame(data=train_performance,
                          index=index,
-                         columns=columns).to_csv(os.path.join(RESULTS_FOLDER_PATH, "meta_dataset_train.csv"),
+                         columns=columns).to_csv(os.path.join(RESULTS_FOLDER_PATH, META_DATASET_TRAIN),
                                                  index=False)
             pd.DataFrame(data=test_performance,
                          index=index,
-                         columns=columns).to_csv(os.path.join(RESULTS_FOLDER_PATH, "meta_dataset_test.csv"),
+                         columns=columns).to_csv(os.path.join(RESULTS_FOLDER_PATH, META_DATASET_TEST),
                                                  index=False)
 
     @staticmethod
@@ -154,6 +185,49 @@ class Main:
         # TODO: add later
         pass
 
+    @staticmethod
+    def _to_time_series(data: pd.DataFrame,
+                        n_in: int,
+                        n_out: int = 1,
+                        dropnan: bool = True):
+        """
+        Frame a time series as a supervised learning dataset.
+        Arguments:
+        data: Sequence of observations as a list or NumPy array.
+        n_in: Number of lag observations as input (X).
+        n_out: Number of observations as output (y).
+        dropnan: Boolean whether or not to drop rows with NaN values.
+        Returns:
+        Pandas DataFrame of series framed for supervised learning.
+        """
+        n_vars = 1 if type(data) is list else data.shape[1]
+        if not isinstance(data, pd.DataFrame):
+            df = pd.DataFrame(data)
+        else:
+            df = data
+        cols = []
+        names = []
+        # input sequence (t-n, ... t-1)
+        for i in range(n_in, 0, -1):
+            cols.append(df.shift(i))
+            names += [('var%d(t-%d)' % (j + 1, i)) for j in range(n_vars)]
+        # forecast sequence (t, t+1, ... t+n)
+        for i in range(0, n_out):
+            cols.append(df.shift(-i))
+            if i == 0:
+                names += [('var%d(t)' % (j + 1)) for j in range(n_vars)]
+            else:
+                names += [('var%d(t+%d)' % (j + 1, i)) for j in range(n_vars)]
+        # put it all together
+        agg = pd.concat(cols,
+                        axis=1)
+        agg.columns = names
+        # drop rows with NaN values
+        if dropnan:
+            agg.dropna(inplace=True)
+        return agg
+
 
 if __name__ == '__main__':
-    Main.run()
+    Main.run(prepare_meta_dataset=True,
+             analyze_meta_dataset=False)

@@ -5,3 +5,7 @@ seaborn
 scipy
 scikit-learn
 TPOT
+dl8.5
+gplearn
+symreg
+auto-sklearn
