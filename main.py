@@ -6,12 +6,14 @@ from sklearn.metrics import accuracy_score, mean_absolute_error
 
 from sklearn.linear_model import LinearRegression  # linear model for regression and classification
 try:
-    from dl85 import DL85Predictor  # Optimal decision tree
+    #from dl85 import DL85Predictor  # Optimal decision tree
+    from model.gosdt import GOSDT
     import autosklearn.regression  # AutoML baseline - https://automl.github.io/auto-sklearn/master/#manual [regression]
 
     from tpot import TPOTClassifier, TPOTRegressor  # bio-inspired autoML
     from gplearn.genetic import SymbolicRegressor  # bio-inspired autoML #2
-    from symreg import Regressor  # bio-inspired autoML #3
+    from autogluon.tabular import TabularDataset, TabularPredictor  # bio-inspired autoML #3
+    
     # TODO: add later # bio-inspired autoML #4
 except Exception as error:
     print("Error in loading libraries - try again! Error = {}".format(error))
@@ -22,25 +24,18 @@ from model_eval_func import model_eval_func, model_eval_func_titles
 
 
 # define the model's score metric for each case so it will be easy to replace later #
-def metric(y_pred,
-           y):
+def metric(y_pred, y):
     if len(set(y)) / len(y) > 0.1:
-        return regression_metric(y_pred=y_pred,
-                                 y=y)
-    return classification_metric(y_pred=y_pred,
-                                 y=y)
+        return regression_metric(y_pred=y_pred, y=y)
+    return classification_metric(y_pred=y_pred, y=y)
 
 
-def classification_metric(y_pred,
-                          y):
-    return accuracy_score(y_pred=y_pred,
-                          y_true=y)
+def classification_metric(y_pred, y):
+    return accuracy_score(y_pred=y_pred,y_true=y)
 
 
-def regression_metric(y_pred,
-                      y):
-    return mean_absolute_error(y_pred=y_pred,
-                               y_true=y)
+def regression_metric(y_pred, y):
+    return mean_absolute_error(y_pred=y_pred, y_true=y)
 
 
 class Main:
@@ -52,8 +47,7 @@ class Main:
         pass
 
     @staticmethod
-    def run(prepare_meta_dataset: bool,
-            analyze_meta_dataset: bool):
+    def run(prepare_meta_dataset: bool, analyze_meta_dataset: bool):
         Main.prepare_io()
         if prepare_meta_dataset:
             Main.prepare_meta_datasets()
