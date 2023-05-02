@@ -25,8 +25,8 @@ from model_eval_func import model_eval_func, model_eval_func_titles
 
 # define the model's score metric for each case so it will be easy to replace later #
 def metric(y_pred, y):
-    print(y)
-    print(y_pred)
+    y = list(y)
+    y_pred = list(y_pred)
     metricList = []
     metricList.append(mean_absolute_error(y_true=y,y_pred=y_pred))
     metricList.append(mean_squared_error(y_true=y,y_pred=y_pred))
@@ -131,9 +131,9 @@ class Main:
                      df.pop(config_df[file_name]["y_target_col"]))
             #x = df.drop(config_df[file_name]["y_target_col"])
             # split to x and y
-            x = df.iloc[:, 0:]
+            x = df.iloc[:, :-1]
             #copy_x = x.copy()
-            y = df.iloc[:, 0]
+            y = df.iloc[:, -1]
             #copy_y = y.copy()
 
             # split to train and test for later
