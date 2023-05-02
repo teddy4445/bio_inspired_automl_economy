@@ -1,12 +1,32 @@
 import pandas as pd
 from sklearn.linear_model import LinearRegression
 from sklearn.model_selection import train_test_split
+from sklearn.metrics import mean_absolute_error,mean_squared_error
+
+
+
+def r2_score(y_true,y_pred):
+    r2 = (1 - (((y_true - y_pred) * 2).sum()) / (((y_true - y_true.mean()) * 2).sum()))
+    return r2
+
 
 def model_setup(x,y):
     model = LinearRegression()
-    model.fit(x,y)
-    print(model)
+    x_train, x_test, y_train, y_test = train_test_split(x, y,test_size=0.2,random_state=73)
+    fit_model = model
+    #fit_model.fit(x, y)
+    #print("fit: ")
+    #model_fit_predict(model,x,y,y,x)
+    #print("train: ")
+    #model_fit_predict(model,x_train,y_train,y_train,x_train)
+    print("test ")
+    model_fit_predict(model,x_train,y_train,y_test,x_test)
 
+
+def model_fit_predict(model,x,y,yForPredict,xForPredict):
+    fit_model = model.fit(x,y)
+    yPred = fit_model.predict(xForPredict)
+    print(f"MSE: {mean_squared_error(yForPredict,yPred)} MAE: {mean_absolute_error(yForPredict,yPred)} R2: {r2_score(yForPredict,yPred)}")
 
 
 def _to_time_series(data: pd.DataFrame,
@@ -61,11 +81,11 @@ answer = []
 #    answer.append(ts_row)
 #ts_df = pd.concat(answer)
 #ts_df.to_csv("temp.csv", index=False)
-print(df)
+#print(df)
 #for col in list(df):
 #    df[col] = df[col].astype('int')
 y = df["Pov_2012"]
 x = df.drop(columns=["Pov_2012"])
 model_setup(x,y)
-print(x)
-print(y)
+#print(x)
+#print(y)
